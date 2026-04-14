@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Step = "home" | "estimate" | "results" | "booking";
 
@@ -51,11 +52,19 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{children}</div>;
 }
 
-function PrimaryButton({ children, onClick, full = false }: { children: React.ReactNode; onClick?: () => void; full?: boolean }) {
+function PrimaryButton({
+  children,
+  onClick,
+  full = false,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  full?: boolean;
+}) {
   return (
     <button
       onClick={onClick}
-      className={`inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#C9A96E] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-105 ${full ? "w-full" : ""}`}
+      className={`inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-[#C9A96E] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-105 ${full ? "w-full" : ""}`}
     >
       {children}
     </button>
@@ -66,7 +75,7 @@ function SecondaryButton({ children, onClick, full = false }: { children: React.
   return (
     <button
       onClick={onClick}
-      className={`inline-flex min-h-12 items-center justify-center rounded-2xl border border-white/15 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/5 ${full ? "w-full" : ""}`}
+      className={`inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/15 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/5 ${full ? "w-full" : ""}`}
     >
       {children}
     </button>
@@ -92,6 +101,64 @@ function ShellCard({ children, className = "" }: { children: React.ReactNode; cl
   return <div className={`rounded-[28px] border border-white/10 bg-white/5 backdrop-blur ${className}`}>{children}</div>;
 }
 
+function StepProgress({ step }: { step: Step }) {
+  const steps = [
+    { key: "estimate", label: "Estimate" },
+    { key: "results", label: "Results" },
+    { key: "booking", label: "Booking" },
+  ];
+
+  const activeIndex = step === "estimate" ? 0 : step === "results" ? 1 : step === "booking" ? 2 : -1;
+
+  if (step === "home") return null;
+
+  return (
+    <div className="mb-5 sm:mb-6">
+      <div className="mb-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+        {steps.map((item, index) => (
+          <span key={item.key} className={index <= activeIndex ? "text-zinc-200" : "text-zinc-600"}>
+            {item.label}
+          </span>
+        ))}
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-[#C9A96E] transition-all duration-300"
+          style={{ width: activeIndex === 0 ? "33.33%" : activeIndex === 1 ? "66.66%" : "100%" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MobileStickyCTA({ step, onPrimary, onSecondary }: { step: Step; onPrimary: () => void; onSecondary?: () => void }) {
+  if (step === "home") return null;
+
+  const primaryLabel = step === "estimate" ? "Continue to Results" : step === "results" ? "Continue to Booking" : "Confirm Appointment Request";
+  const secondaryLabel = step === "results" ? "Edit Estimate" : "Back";
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0B0B0B]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3 backdrop-blur lg:hidden">
+      <div className="flex gap-2">
+        {onSecondary && (
+          <button
+            onClick={onSecondary}
+            className="inline-flex min-h-[52px] w-[40%] items-center justify-center rounded-2xl border border-white/15 bg-transparent px-4 py-3 text-xs font-semibold text-white transition hover:bg-white/5"
+          >
+            {secondaryLabel}
+          </button>
+        )}
+        <button
+          onClick={onPrimary}
+          className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-2xl bg-[#C9A96E] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-105"
+        >
+          {primaryLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function HarrisContractingLiveDemo() {
   const [step, setStep] = useState<Step>("home");
   const [project, setProject] = useState<ProjectName>("Kitchen Remodel");
@@ -107,41 +174,54 @@ export default function HarrisContractingLiveDemo() {
   }, [project, size, finish]);
 
   const stepNumber = step === "estimate" ? 1 : step === "results" ? 2 : step === "booking" ? 3 : 0;
+  useEffect(() => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}, [step]);
 
-  return (
-    <div className="min-h-screen bg-[#0B0B0B] text-white">
+ return (
+  <AnimatePresence mode="wait">
+    <motion.div
+      key={step}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.35, ease: "easeInOut" }}
+      className="min-h-screen bg-[#0B0B0B] text-white"
+    >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(201,169,110,0.16),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.06),transparent_24%)]" />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-5 sm:px-6 lg:px-8">
-        <header className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative mx-auto max-w-7xl px-4 pb-28 pt-4 sm:px-6 sm:pb-12 sm:pt-5 lg:px-8">
+        <header className="mb-5 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-[11px] uppercase tracking-[0.35em] text-zinc-500">Harris Contracting</div>
-            <div className="mt-1 text-lg font-semibold sm:text-xl">Franchise-Level Client Experience</div>
+            <div className="mt-1 text-base font-semibold sm:text-xl">Franchise-Level Client Experience</div>
           </div>
           <div className="flex gap-3">
             <PrimaryButton onClick={() => setStep(step === "home" ? "estimate" : "booking")}>{step === "home" ? "Start Estimate" : "Book Review"}</PrimaryButton>
           </div>
         </header>
 
+        <StepProgress step={step} />
+
         {step === "home" && (
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8 lg:pt-6">
-            <section className="order-2 lg:order-1 lg:pr-6">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8 lg:pt-6">
+            <section className="order-1 lg:order-1 lg:pr-6">
               <div className="mb-5 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-zinc-300">
                 Projects Starting at $75K+
               </div>
-              <h1 className="max-w-3xl text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">
+              <h1 className="max-w-3xl text-[2.2rem] font-semibold leading-[1.02] sm:text-5xl lg:text-6xl">
                 See What Your Renovation Will Cost <span className="text-[#C9A96E]">Before You Commit</span>
               </h1>
-              <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">
+              <p className="mt-4 max-w-2xl text-[15px] leading-7 text-zinc-400 sm:text-lg">
                 A guided estimate experience designed to pre-qualify clients, introduce pricing early, and make a one-man operation feel like a premium, system-driven firm.
               </p>
 
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <PrimaryButton onClick={() => setStep("estimate")}>Start Your Estimate</PrimaryButton>
                 <SecondaryButton onClick={() => setStep("results")}>Preview Results Experience</SecondaryButton>
               </div>
 
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <div className="mt-7 grid gap-3 sm:grid-cols-3">
                 {[
                   "Structured lead filtering",
                   "Premium pricing presentation",
@@ -154,17 +234,17 @@ export default function HarrisContractingLiveDemo() {
               </div>
             </section>
 
-            <section className="order-1 lg:order-2">
+            <section className="order-2 lg:order-2">
               <ShellCard className="overflow-hidden">
-                <div className="border-b border-white/10 p-5 sm:p-6">
+                <div className="border-b border-white/10 p-4 sm:p-6">
                   <SectionLabel>Live Demo Preview</SectionLabel>
-                  <div className="text-2xl font-semibold sm:text-3xl">Client Estimate Experience</div>
+                  <div className="text-xl font-semibold sm:text-3xl">Client Estimate Experience</div>
                 </div>
 
-                <div className="space-y-5 p-5 sm:p-6">
-                  <div className="rounded-[24px] border border-[#C9A96E]/25 bg-[#C9A96E]/10 p-5 sm:p-6">
+                <div className="space-y-4 p-4 sm:space-y-5 sm:p-6">
+                  <div className="rounded-[24px] border border-[#C9A96E]/25 bg-[#C9A96E]/10 p-4 sm:p-6">
                     <div className="text-sm text-zinc-300">Estimated Investment</div>
-                    <div className="mt-2 text-3xl font-semibold leading-tight sm:text-4xl">
+                    <div className="mt-2 text-[1.95rem] font-semibold leading-tight sm:text-4xl">
                       {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
                     </div>
                     <div className="mt-2 text-sm text-zinc-400">Based on current demo selections</div>
@@ -192,19 +272,19 @@ export default function HarrisContractingLiveDemo() {
 
         {step === "estimate" && (
           <div className="mx-auto max-w-4xl">
-            <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400">
+            <div className="mb-4 flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <span>Step {stepNumber} of 3</span>
               <span>Build the estimate first. Fancy comes after structure.</span>
             </div>
 
             <ShellCard className="p-5 sm:p-6 lg:p-8">
               <SectionLabel>Step 1 · Project Builder</SectionLabel>
-              <h2 className="text-3xl font-semibold sm:text-4xl">Tell us about your project</h2>
-              <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-400">
+              <h2 className="text-[2rem] font-semibold leading-tight sm:text-4xl">Tell us about your project</h2>
+              <p className="mt-3 max-w-2xl text-[15px] leading-7 text-zinc-400 sm:text-base">
                 This screen is focused on one thing only: building a realistic planning range before a project review is scheduled.
               </p>
 
-              <div className="mt-8 space-y-8">
+              <div className="mt-7 space-y-7">
                 <div>
                   <SectionLabel>Choose Project Type</SectionLabel>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -218,7 +298,7 @@ export default function HarrisContractingLiveDemo() {
                             : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
                         }`}
                       >
-                        <div className="text-lg font-medium">{item}</div>
+                        <div className="text-base font-medium sm:text-lg">{item}</div>
                         <div className="mt-1 text-sm text-zinc-400">Select the scope that best matches the project</div>
                       </button>
                     ))}
@@ -246,7 +326,7 @@ export default function HarrisContractingLiveDemo() {
 
               <div className="mt-8 rounded-[24px] border border-[#C9A96E]/25 bg-[#C9A96E]/10 p-5 sm:p-6">
                 <div className="text-sm text-zinc-300">Current Planning Range</div>
-                <div className="mt-2 text-3xl font-semibold leading-tight sm:text-4xl">
+                <div className="mt-2 text-[1.95rem] font-semibold leading-tight sm:text-4xl">
                   {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
                 </div>
                 <div className="mt-2 text-sm leading-6 text-zinc-400">
@@ -254,7 +334,7 @@ export default function HarrisContractingLiveDemo() {
                 </div>
               </div>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-7 hidden flex-col gap-3 sm:flex-row lg:flex">
                 <PrimaryButton onClick={() => setStep("results")}>Continue to Results</PrimaryButton>
                 <SecondaryButton onClick={() => setStep("home")}>Back</SecondaryButton>
               </div>
@@ -264,15 +344,15 @@ export default function HarrisContractingLiveDemo() {
 
         {step === "results" && (
           <div className="mx-auto max-w-5xl">
-            <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400">
+            <div className="mb-4 flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <span>Step {stepNumber} of 3</span>
               <span>Now the number does the heavy lifting.</span>
             </div>
 
             <div className="text-center">
               <SectionLabel>Step 2 · Results Experience</SectionLabel>
-              <h2 className="text-3xl font-semibold sm:text-4xl lg:text-5xl">Your Project Estimate Is Ready</h2>
-              <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">
+              <h2 className="text-[2rem] font-semibold leading-tight sm:text-4xl lg:text-5xl">Your Project Estimate Is Ready</h2>
+              <p className="mx-auto mt-4 max-w-2xl text-[15px] leading-7 text-zinc-400 sm:text-lg">
                 This is where pricing is introduced before the call, so the conversation starts from clarity instead of guesswork.
               </p>
             </div>
@@ -280,7 +360,7 @@ export default function HarrisContractingLiveDemo() {
             <ShellCard className="mt-8 p-5 sm:p-6 lg:p-8">
               <div className="rounded-[28px] border border-[#C9A96E]/25 bg-[#C9A96E]/10 p-6 text-center sm:p-8">
                 <div className="text-sm uppercase tracking-[0.25em] text-zinc-300">Estimated Investment</div>
-                <div className="mt-3 text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">
+                <div className="mt-3 text-[2.35rem] font-semibold leading-tight sm:text-5xl lg:text-6xl">
                   {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
                 </div>
                 <div className="mt-3 text-sm leading-6 text-zinc-400">
@@ -288,7 +368,7 @@ export default function HarrisContractingLiveDemo() {
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="mt-5 grid gap-4 md:grid-cols-3">
                 {[
                   ["Project", project],
                   ["Finish", finish],
@@ -301,7 +381,7 @@ export default function HarrisContractingLiveDemo() {
                 ))}
               </div>
 
-              <div className="mt-6 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+              <div className="mt-5 grid gap-5 grid-cols-1 lg:grid-cols-[1.05fr_0.95fr]">
                 <div className="rounded-[28px] border border-white/10 bg-black/30 p-5 sm:p-6">
                   <SectionLabel>Owner Video Placeholder</SectionLabel>
                   <div className="flex min-h-[220px] items-center justify-center rounded-[24px] border border-white/10 bg-gradient-to-br from-zinc-900 to-zinc-800 p-6 text-center">
@@ -325,7 +405,7 @@ export default function HarrisContractingLiveDemo() {
                     ))}
                   </div>
 
-                  <div className="mt-5 grid gap-3">
+                  <div className="mt-5 hidden gap-3 lg:grid">
                     <PrimaryButton full onClick={() => setStep("booking")}>Continue to Booking</PrimaryButton>
                     <SecondaryButton full onClick={() => setStep("estimate")}>Back to Estimate</SecondaryButton>
                   </div>
@@ -337,7 +417,7 @@ export default function HarrisContractingLiveDemo() {
 
         {step === "booking" && (
           <div className="mx-auto max-w-2xl">
-            <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400">
+            <div className="mb-4 flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <span>Step {stepNumber} of 3</span>
               <span>Final step: turn interest into a scheduled review.</span>
             </div>
@@ -345,13 +425,13 @@ export default function HarrisContractingLiveDemo() {
             <ShellCard className="p-5 sm:p-6 lg:p-8">
               <div className="text-center">
                 <SectionLabel>Step 3 · Booking</SectionLabel>
-                <h2 className="text-3xl font-semibold sm:text-4xl">Schedule Your Project Review</h2>
-                <p className="mt-3 text-base leading-7 text-zinc-400 sm:text-lg">
+                <h2 className="text-[2rem] font-semibold leading-tight sm:text-4xl">Schedule Your Project Review</h2>
+                <p className="mt-3 text-[15px] leading-7 text-zinc-400 sm:text-lg">
                   Qualified prospects move from estimate to conversation here. No clutter. No wandering around wondering what comes next.
                 </p>
               </div>
 
-              <div className="mt-7 grid gap-4">
+              <div className="mt-6 grid gap-4">
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -380,7 +460,7 @@ export default function HarrisContractingLiveDemo() {
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-3">
+              <div className="mt-5 hidden gap-3 lg:grid">
                 <PrimaryButton full>Confirm Appointment Request</PrimaryButton>
                 <SecondaryButton full onClick={() => setStep("results")}>Back to Results</SecondaryButton>
               </div>
@@ -391,7 +471,19 @@ export default function HarrisContractingLiveDemo() {
             </ShellCard>
           </div>
         )}
-      </div>
-    </div>
-  );
+           </div>
+  <MobileStickyCTA
+  step={step}
+  onPrimary={() => {
+    if (step === "estimate") setStep("results");
+    else if (step === "results") setStep("booking");
+  }}
+  onSecondary={() => {
+    if (step === "results") setStep("estimate");
+    else if (step === "estimate") setStep("home");
+  }}
+/>
+    </motion.div>
+  </AnimatePresence>
+);
 }
