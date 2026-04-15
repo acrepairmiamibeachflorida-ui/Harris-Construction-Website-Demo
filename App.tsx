@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 type Step = "home" | "estimate" | "results" | "booking";
-
 type ProjectName = "Kitchen Remodel" | "Bathroom Remodel" | "Full Renovation" | "Addition";
 type SizeName = "Small" | "Medium" | "Large";
 type FinishName = "Standard" | "High-End" | "Luxury";
+type EstimateSubstep = 0 | 1 | 2;
 
 const projectOptions: ProjectName[] = [
   "Kitchen Remodel",
@@ -48,442 +47,869 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{children}</div>;
-}
-
-function PrimaryButton({
-  children,
-  onClick,
-  full = false,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  full?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-[#C9A96E] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-105 ${full ? "w-full" : ""}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function SecondaryButton({ children, onClick, full = false }: { children: React.ReactNode; onClick?: () => void; full?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/15 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/5 ${full ? "w-full" : ""}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function OptionButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`min-h-12 rounded-2xl border px-4 py-3 text-sm font-medium transition ${
-        active
-          ? "border-[#C9A96E] bg-[#C9A96E]/10 text-white shadow-[0_0_0_1px_rgba(201,169,110,0.25)]"
-          : "border-white/10 bg-white/5 text-zinc-300 hover:border-white/20 hover:bg-white/10"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function ShellCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-[28px] border border-white/10 bg-white/5 backdrop-blur ${className}`}>{children}</div>;
-}
-
-function StepProgress({ step }: { step: Step }) {
-  const steps = [
-    { key: "estimate", label: "Estimate" },
-    { key: "results", label: "Results" },
-    { key: "booking", label: "Booking" },
-  ];
-
-  const activeIndex = step === "estimate" ? 0 : step === "results" ? 1 : step === "booking" ? 2 : -1;
-
-  if (step === "home") return null;
-
-  return (
-    <div className="mb-5 sm:mb-6">
-      <div className="mb-3 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-        {steps.map((item, index) => (
-          <span key={item.key} className={index <= activeIndex ? "text-zinc-200" : "text-zinc-600"}>
-            {item.label}
-          </span>
-        ))}
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full bg-[#C9A96E] transition-all duration-300"
-          style={{ width: activeIndex === 0 ? "33.33%" : activeIndex === 1 ? "66.66%" : "100%" }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function MobileStickyCTA({ step, onPrimary, onSecondary }: { step: Step; onPrimary: () => void; onSecondary?: () => void }) {
-  if (step === "home") return null;
-
-  const primaryLabel = step === "estimate" ? "Continue to Results" : step === "results" ? "Continue to Booking" : "Confirm Appointment Request";
-  const secondaryLabel = step === "results" ? "Edit Estimate" : "Back";
-
-  return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0B0B0B]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3 backdrop-blur lg:hidden">
-      <div className="flex gap-2">
-        {onSecondary && (
-          <button
-            onClick={onSecondary}
-            className="inline-flex min-h-[52px] w-[40%] items-center justify-center rounded-2xl border border-white/15 bg-transparent px-4 py-3 text-xs font-semibold text-white transition hover:bg-white/5"
-          >
-            {secondaryLabel}
-          </button>
-        )}
-        <button
-          onClick={onPrimary}
-          className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-2xl bg-[#C9A96E] px-5 py-3 text-sm font-semibold text-black transition hover:brightness-105"
-        >
-          {primaryLabel}
-        </button>
-      </div>
-    </div>
-  );
+function isMobileWidth() {
+  return typeof window !== "undefined" ? window.innerWidth < 768 : false;
 }
 
 export default function HarrisContractingLiveDemo() {
   const [step, setStep] = useState<Step>("home");
+  const [estimateSubstep, setEstimateSubstep] = useState<EstimateSubstep>(0);
   const [project, setProject] = useState<ProjectName>("Kitchen Remodel");
   const [size, setSize] = useState<SizeName>("Medium");
   const [finish, setFinish] = useState<FinishName>("High-End");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [isMobile, setIsMobile] = useState(isMobileWidth());
+  const [visible, setVisible] = useState(false);
+  const [pricePulse, setPricePulse] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   const estimate = useMemo(() => {
     const [min, max] = pricing[project][size][finish];
     return { min, max };
   }, [project, size, finish]);
 
-  const stepNumber = step === "estimate" ? 1 : step === "results" ? 2 : step === "booking" ? 3 : 0;
   useEffect(() => {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}, [step]);
+    const onResize = () => setIsMobile(isMobileWidth());
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
- return (
-  <AnimatePresence mode="wait">
-    <motion.div
-      key={step}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.35, ease: "easeInOut" }}
-      className="min-h-screen bg-[#0B0B0B] text-white"
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(201,169,110,0.16),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.06),transparent_24%)]" />
+  useEffect(() => {
+    setVisible(true);
+  }, []);
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-28 pt-4 sm:px-6 sm:pb-12 sm:pt-5 lg:px-8">
-        <header className="mb-5 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step, estimateSubstep]);
+
+  useEffect(() => {
+    setPricePulse(true);
+    const timer = window.setTimeout(() => setPricePulse(false), 280);
+    return () => window.clearTimeout(timer);
+  }, [project, size, finish, estimateSubstep]);
+
+  const colors = {
+    bg: "#0B0B0B",
+    panel: "#161616",
+    panelSoft: "rgba(255,255,255,0.04)",
+    border: "rgba(255,255,255,0.10)",
+    text: "#FFFFFF",
+    muted: "#A1A1AA",
+    gold: "#C9A96E",
+    goldSoft: "rgba(201,169,110,0.12)",
+    goldBorder: "rgba(201,169,110,0.35)",
+  };
+
+  const progressWidth = step === "home" ? "0%" : step === "estimate" ? "33%" : step === "results" ? "66%" : "100%";
+
+  const styles = {
+    page: {
+      minHeight: "100vh",
+      background: `radial-gradient(circle at top, rgba(201,169,110,0.16), transparent 28%), ${colors.bg}`,
+      color: colors.text,
+      fontFamily: "Inter, system-ui, sans-serif",
+      padding: isMobile ? "16px 14px 110px" : "28px 20px 40px",
+      opacity: visible ? 1 : 0,
+      transition: "opacity 0.45s ease",
+    } as React.CSSProperties,
+    shell: {
+      maxWidth: 1180,
+      margin: "0 auto",
+    } as React.CSSProperties,
+    topBar: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: isMobile ? "flex-start" : "center",
+      flexDirection: isMobile ? "column" : "row",
+      gap: 14,
+      marginBottom: isMobile ? 18 : 28,
+    } as React.CSSProperties,
+    eyebrow: {
+      fontSize: 11,
+      letterSpacing: "0.28em",
+      textTransform: "uppercase",
+      color: "#71717A",
+      marginBottom: 6,
+    } as React.CSSProperties,
+    brandTitle: {
+      fontSize: isMobile ? 18 : 22,
+      fontWeight: 700,
+      lineHeight: 1.15,
+    } as React.CSSProperties,
+    primaryButton: {
+      background: colors.gold,
+      color: "#000",
+      border: "none",
+      borderRadius: 16,
+      minHeight: 50,
+      padding: isMobile ? "12px 18px" : "14px 22px",
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer",
+      boxShadow: "0 10px 30px rgba(201,169,110,0.25)",
+      transition: "all 0.2s ease",
+    } as React.CSSProperties,
+    secondaryButton: {
+      background: "transparent",
+      color: colors.text,
+      border: `1px solid ${colors.border}`,
+      borderRadius: 16,
+      minHeight: 50,
+      padding: isMobile ? "12px 18px" : "14px 22px",
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    } as React.CSSProperties,
+    stepBar: {
+      marginBottom: 16,
+      border: `1px solid ${colors.border}`,
+      background: colors.panelSoft,
+      borderRadius: 16,
+      padding: isMobile ? "12px 14px" : "12px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+      color: colors.muted,
+      fontSize: 14,
+    } as React.CSSProperties,
+    card: {
+      background: colors.panel,
+      border: `1px solid ${colors.border}`,
+      borderRadius: 28,
+      padding: isMobile ? 18 : 26,
+      boxShadow: "0 20px 50px rgba(0,0,0,0.22)",
+      transition: "all 0.25s ease",
+    } as React.CSSProperties,
+    goldCard: {
+      background: colors.goldSoft,
+      border: `1px solid ${colors.goldBorder}`,
+      borderRadius: 24,
+      padding: isMobile ? 18 : 24,
+    } as React.CSSProperties,
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: "0.24em",
+      textTransform: "uppercase",
+      color: "#71717A",
+      marginBottom: 10,
+    } as React.CSSProperties,
+    h1: {
+      fontSize: isMobile ? 34 : 62,
+      lineHeight: 1.02,
+      fontWeight: 700,
+      margin: 0,
+      maxWidth: 720,
+    } as React.CSSProperties,
+    h2: {
+      fontSize: isMobile ? 32 : 48,
+      lineHeight: 1.06,
+      fontWeight: 700,
+      margin: 0,
+    } as React.CSSProperties,
+    body: {
+      fontSize: isMobile ? 15 : 18,
+      lineHeight: 1.7,
+      color: colors.muted,
+    } as React.CSSProperties,
+    homeGrid: {
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "1.08fr 0.92fr",
+      gap: isMobile ? 18 : 24,
+      alignItems: "start",
+    } as React.CSSProperties,
+    chipsGrid: {
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+      gap: 12,
+      marginTop: 24,
+    } as React.CSSProperties,
+    chip: {
+      border: `1px solid ${colors.border}`,
+      background: colors.panelSoft,
+      color: "#D4D4D8",
+      borderRadius: 18,
+      padding: "14px 16px",
+      fontSize: 14,
+      lineHeight: 1.5,
+    } as React.CSSProperties,
+    projectGrid: {
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)",
+      gap: 12,
+    } as React.CSSProperties,
+    projectCard: (active: boolean): React.CSSProperties => ({
+      border: active ? `1px solid ${colors.gold}` : `1px solid ${colors.border}`,
+      background: active ? colors.goldSoft : colors.panelSoft,
+      color: colors.text,
+      borderRadius: 22,
+      padding: isMobile ? 16 : 18,
+      textAlign: "left",
+      cursor: "pointer",
+      minHeight: 88,
+      transition: "all 0.2s ease",
+    }),
+    optionGrid: {
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+      gap: 12,
+    } as React.CSSProperties,
+    optionButton: (active: boolean): React.CSSProperties => ({
+      border: active ? `1px solid ${colors.gold}` : `1px solid ${colors.border}`,
+      background: active ? colors.goldSoft : colors.panelSoft,
+      color: colors.text,
+      borderRadius: 18,
+      padding: "14px 16px",
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      minHeight: 50,
+      transition: "all 0.2s ease",
+    }),
+    twoColumn: {
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "1.06fr 0.94fr",
+      gap: isMobile ? 16 : 22,
+    } as React.CSSProperties,
+    summaryGrid: {
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+      gap: 14,
+      marginTop: 22,
+    } as React.CSSProperties,
+    summaryCard: {
+      border: `1px solid ${colors.border}`,
+      background: colors.panelSoft,
+      borderRadius: 20,
+      padding: "16px 18px",
+      transition: "all 0.2s ease",
+    } as React.CSSProperties,
+    input: {
+      height: 54,
+      width: "100%",
+      borderRadius: 18,
+      border: `1px solid ${colors.border}`,
+      background: "rgba(0,0,0,0.28)",
+      color: colors.text,
+      padding: "0 16px",
+      fontSize: 15,
+      outline: "none",
+      boxSizing: "border-box",
+    } as React.CSSProperties,
+    sticky: {
+      position: "fixed",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 40,
+      borderTop: `1px solid ${colors.border}`,
+      background: "rgba(11,11,11,0.96)",
+      backdropFilter: "blur(12px)",
+      padding: "12px 14px calc(env(safe-area-inset-bottom) + 14px)",
+    } as React.CSSProperties,
+  };
+
+  function buttonHoverProps(): React.HTMLAttributes<HTMLButtonElement> {
+    return isMobile
+      ? {}
+      : {
+          onMouseEnter: (e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
+          },
+          onMouseLeave: (e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0px)";
+          },
+        };
+  }
+
+  function cardHoverProps(): React.HTMLAttributes<HTMLDivElement> {
+    return isMobile
+      ? {}
+      : {
+          onMouseEnter: (e) => {
+            (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)";
+          },
+          onMouseLeave: (e) => {
+            (e.currentTarget as HTMLDivElement).style.transform = "translateY(0px)";
+          },
+        };
+  }
+
+  function progressBar() {
+    return (
+      <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 999, overflow: "hidden", marginTop: 8, width: "100%" }}>
+        <div style={{ width: progressWidth, height: "100%", background: colors.gold, transition: "width 0.4s ease" }} />
+      </div>
+    );
+  }
+
+  function renderHome() {
+    return (
+      <div style={styles.homeGrid}>
+        <div>
+          <div
+            style={{
+              display: "inline-block",
+              padding: "10px 14px",
+              borderRadius: 999,
+              border: `1px solid ${colors.border}`,
+              background: colors.panelSoft,
+              color: "#D4D4D8",
+              fontSize: 13,
+              marginBottom: 18,
+            }}
+          >
+            Projects Starting at $75K+
+          </div>
+          <h1 style={styles.h1}>
+            See What Your Renovation Will Cost <span style={{ color: colors.gold }}>Before You Commit</span>
+          </h1>
+          <p style={{ ...styles.body, maxWidth: 640, marginTop: 18 }}>
+            A guided estimate experience designed to pre-qualify clients, introduce pricing early, and make a one-man operation feel like a premium, system-driven firm.
+          </p>
+
+          <div style={{ display: "flex", gap: 12, flexDirection: isMobile ? "column" : "row", marginTop: 22 }}>
+            <button style={styles.primaryButton} onClick={() => { setEstimateSubstep(0); setStep("estimate"); }} {...buttonHoverProps()}>Start Your Estimate</button>
+            <button style={styles.secondaryButton} onClick={() => setStep("results")} {...buttonHoverProps()}>Preview Results Experience</button>
+          </div>
+
+          <div style={styles.chipsGrid}>
+            {["Structured lead filtering", "Premium pricing presentation", "Less wasted back-and-forth"].map((item) => (
+              <div key={item} style={styles.chip}>{item}</div>
+            ))}
+          </div>
+        </div>
+
+        <div style={styles.card} {...cardHoverProps()}>
+          <div style={styles.sectionLabel}>Live Demo Preview</div>
+          <div style={{ fontSize: isMobile ? 24 : 30, fontWeight: 700, marginBottom: 18 }}>Client Estimate Experience</div>
+
+          <div style={styles.goldCard}>
+            <div style={{ fontSize: 14, color: "#E4E4E7" }}>Estimated Investment</div>
+            <div
+              style={{
+                fontSize: isMobile ? 30 : 42,
+                fontWeight: 700,
+                marginTop: 10,
+                lineHeight: 1.1,
+                transform: pricePulse ? "scale(1.025)" : "scale(1)",
+                opacity: pricePulse ? 0.92 : 1,
+                transition: "transform 0.24s ease, opacity 0.24s ease"
+              }}
+            >
+              {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
+            </div>
+            <div style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>Based on current demo selections</div>
+          </div>
+
+          <div style={{ ...styles.projectGrid, marginTop: 16 }}>
+            {projectOptions.map((item) => (
+              <button key={item} style={styles.projectCard(project === item)} onClick={() => setProject(item)} {...buttonHoverProps()}>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{item}</div>
+                <div style={{ color: colors.muted, fontSize: 13, marginTop: 6 }}>Premium project planning flow</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderEstimateOptions() {
+    if (estimateSubstep === 0) {
+      return (
+        <div style={styles.projectGrid}>
+          {projectOptions.map((item) => (
+            <button key={item} style={styles.projectCard(project === item)} onClick={() => setProject(item)} {...buttonHoverProps()}>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>{item}</div>
+              <div style={{ color: colors.muted, fontSize: 13, marginTop: 6 }}>Select the scope that best matches the project</div>
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    if (estimateSubstep === 1) {
+      return (
+        <div style={styles.optionGrid}>
+          {sizeOptions.map((item) => (
+            <button key={item} style={styles.optionButton(size === item)} onClick={() => setSize(item)} {...buttonHoverProps()}>{item}</button>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div style={styles.optionGrid}>
+        {finishOptions.map((item) => (
+          <button key={item} style={styles.optionButton(finish === item)} onClick={() => setFinish(item)} {...buttonHoverProps()}>{item}</button>
+        ))}
+      </div>
+    );
+  }
+
+  function renderEstimate() {
+    const titles = ["Choose Project Type", "Select Project Size", "Select Finish Level"];
+    const descriptions = [
+      "Start by selecting the type of project the client is planning.",
+      "Now narrow the scope so the planning range becomes more realistic.",
+      "Finally, choose the finish level to shape the investment range.",
+    ];
+
+    return (
+      <div style={{ maxWidth: 980, margin: "0 auto" }}>
+        <div style={styles.stepBar}>
+          <span>Step 1 of 3</span>
+          <span>Build the estimate one decision at a time.</span>
+          {progressBar()}
+        </div>
+
+        <div style={styles.card} {...cardHoverProps()}>
+          <div style={styles.sectionLabel}>Step 1 · Project Builder</div>
+          <h2 style={styles.h2}>Tell us about your project</h2>
+          <p style={{ ...styles.body, marginTop: 14, maxWidth: 700 }}>
+            This screen is focused on one decision at a time so the experience feels guided instead of overwhelming.
+          </p>
+
+          <div style={{ marginTop: 28 }}>
+            <div style={{ ...styles.sectionLabel, marginBottom: 12 }}>{titles[estimateSubstep]}</div>
+            <p style={{ ...styles.body, fontSize: 14, marginTop: 0, marginBottom: 14 }}>{descriptions[estimateSubstep]}</p>
+            {renderEstimateOptions()}
+          </div>
+
+          {!isMobile && (
+            <div style={{ ...styles.goldCard, marginTop: 26, textAlign: "center" }}>
+              <div style={{ fontSize: 14, color: "#E4E4E7" }}>Current Planning Range</div>
+              <div
+                style={{
+                  fontSize: 40,
+                  fontWeight: 700,
+                  marginTop: 10,
+                  transform: pricePulse ? "scale(1.02)" : "scale(1)",
+                  opacity: pricePulse ? 0.92 : 1,
+                  transition: "transform 0.24s ease, opacity 0.24s ease"
+                }}
+              >
+                {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
+              </div>
+              <div style={{ fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 1.6 }}>
+                Based on {project}, {size.toLowerCase()} scope, and {finish.toLowerCase()} finishes.
+              </div>
+            </div>
+          )}
+
+          {!isMobile && (
+            <div style={{ display: "flex", gap: 12, marginTop: 26 }}>
+              <button
+                style={styles.primaryButton}
+                onClick={() => {
+                  if (estimateSubstep < 2) {
+                    setEstimateSubstep((estimateSubstep + 1) as EstimateSubstep);
+                  } else {
+                    setIsCalculating(true);
+                    window.setTimeout(() => {
+                      setIsCalculating(false);
+                      setStep("results");
+                    }, 900);
+                  }
+                }}
+                {...buttonHoverProps()}
+              >
+                {estimateSubstep < 2 ? "Continue" : "Continue to Results"}
+              </button>
+              <button
+                style={styles.secondaryButton}
+                onClick={() => {
+                  if (estimateSubstep > 0) setEstimateSubstep((estimateSubstep - 1) as EstimateSubstep);
+                  else setStep("home");
+                }}
+                {...buttonHoverProps()}
+              >
+                Back
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderResults() {
+  const urgencyItems = [
+    "Review slots are intentionally limited each week to keep projects moving quickly.",
+    "Clients who delay scheduling usually lose momentum and restart the process later.",
+    "The next step is simply to confirm fit and scope before a final proposal is prepared.",
+  ];
+
+  return (
+    <div style={{ maxWidth: 1040, margin: "0 auto" }}>
+      <div style={styles.stepBar}>
+        <span>Step 2 of 3</span>
+        <span>Now the number does the heavy lifting.</span>
+        {progressBar()}
+      </div>
+
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div style={styles.sectionLabel}>Step 2 · Results Experience</div>
+        <h2 style={styles.h2}>Your Project Estimate Is Ready</h2>
+        <p style={{ ...styles.body, maxWidth: 760, margin: "14px auto 0" }}>
+          This is not the calculator anymore. This is the decision screen — where the range is framed, the project fit is reinforced, and the next step becomes obvious.
+        </p>
+      </div>
+
+      <div style={styles.card} {...cardHoverProps()}>
+        <div style={{ ...styles.goldCard, textAlign: "center" }}>
+          <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: colors.muted, marginBottom: 8 }}>
+            Planning Range Confirmed
+          </div>
+          <div style={{ fontSize: 12, letterSpacing: "0.24em", textTransform: "uppercase", color: "#E4E4E7" }}>
+            Estimated Investment
+          </div>
+          <div
+            style={{
+              fontSize: isMobile ? 38 : 60,
+              fontWeight: 700,
+              lineHeight: 1.06,
+              marginTop: 12,
+              transform: pricePulse ? "scale(1.018)" : "scale(1)",
+              opacity: pricePulse ? 0.94 : 1,
+              transition: "transform 0.24s ease, opacity 0.24s ease",
+            }}
+          >
+            {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
+          </div>
+          <div style={{ fontSize: 14, color: colors.muted, marginTop: 10, lineHeight: 1.6 }}>
+            This is a general planning range based on the selections made in the estimate builder. The purpose here is to move from curiosity to commitment.
+          </div>
+        </div>
+
+        <div style={styles.summaryGrid}>
+          {[["Project", project], ["Finish", finish], ["Client Fit", "Premium Match"]].map(([label, value]) => (
+            <div key={label} style={styles.summaryCard}>
+              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: "#71717A" }}>
+                {label}
+              </div>
+              <div style={{ marginTop: 8, fontWeight: 700 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 18, display: "grid", gap: 12 }}>
+          <div style={{ ...styles.goldCard, textAlign: "center", padding: isMobile ? 16 : 18 }}>
+            <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "#E4E4E7" }}>
+              Next Best Move
+            </div>
+            <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, marginTop: 8 }}>
+              Schedule the review while the project scope is fresh.
+            </div>
+            <div style={{ fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 1.6 }}>
+              This keeps momentum high, confirms fit faster, and moves the right prospects toward a real conversation.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ ...styles.twoColumn, marginTop: 22 }}>
+          <div
+            style={{ ...styles.card, padding: isMobile ? 18 : 22, background: "rgba(0,0,0,0.28)" }}
+            {...cardHoverProps()}
+          >
+            <div style={styles.sectionLabel}>Owner Video Placeholder</div>
+            <div
+              style={{
+                minHeight: 220,
+                borderRadius: 22,
+                border: `1px solid ${colors.border}`,
+                background: "linear-gradient(135deg, #1B1B1B, #111111)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                padding: 22,
+                color: "#E4E4E7",
+                lineHeight: 1.8,
+                fontSize: isMobile ? 14 : 16,
+              }}
+            >
+              “Based on what you selected, your project falls within this planning range. The next step is a project review where scope, materials, and site conditions are confirmed before final pricing.”
+            </div>
+          </div>
+
+          <div style={{ ...styles.card, padding: isMobile ? 18 : 22 }} {...cardHoverProps()}>
+            <div style={styles.sectionLabel}>Why This Converts</div>
+            <div style={{ display: "grid", gap: 12 }}>
+              {[
+                "Pricing is introduced before the call",
+                "Low-budget leads self-filter",
+                "The business feels premium and structured",
+              ].map((item) => (
+                <div key={item} style={styles.chip}>{item}</div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <div style={styles.sectionLabel}>Urgency & Momentum</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {urgencyItems.map((item) => (
+                  <div key={item} style={{ ...styles.chip, fontSize: 13, lineHeight: 1.6 }}>{item}</div>
+                ))}
+              </div>
+            </div>
+
+            {!isMobile && (
+              <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
+                <button style={styles.primaryButton} onClick={() => setStep("booking")} {...buttonHoverProps()}>
+                  Continue to Booking
+                </button>
+                <button
+                  style={styles.secondaryButton}
+                  onClick={() => {
+                    setEstimateSubstep(2);
+                    setStep("estimate");
+                  }}
+                  {...buttonHoverProps()}
+                >
+                  Back to Estimate
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderBooking() {
+  return (
+    <div style={{ maxWidth: 760, margin: "0 auto" }}>
+      <div style={styles.stepBar}>
+        <span>Step 3 of 3</span>
+        <span>Final step: turn interest into a scheduled review.</span>
+        {progressBar()}
+      </div>
+
+      <div style={styles.card} {...cardHoverProps()}>
+        <div style={{ textAlign: "center" }}>
+          <div style={styles.sectionLabel}>Step 3 · Booking</div>
+          <h2 style={styles.h2}>Schedule Your Project Review</h2>
+          <p style={{ ...styles.body, maxWidth: 560, margin: "14px auto 0" }}>
+            Qualified prospects move from estimate to conversation here. Clean, simple, and no chaos.
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gap: 14, marginTop: 24 }}>
+          <input style={styles.input} placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <input style={styles.input} placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input style={styles.input} placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </div>
+
+        <div style={{ ...styles.goldCard, marginTop: 20 }}>
+          <div style={styles.sectionLabel}>Project Review Summary</div>
+          <div style={{ fontSize: isMobile ? 24 : 28, fontWeight: 700 }}>{project} · {finish}</div>
+          <div style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>
+            Planning range: {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+          <div style={{ ...styles.chip, textAlign: "center" }}>
+            Project reviews are limited to qualified opportunities so each client receives focused attention.
+          </div>
+          <div style={{ ...styles.chip, textAlign: "center" }}>
+            Submitting now helps secure the next available review window before scheduling fills.
+          </div>
+        </div>
+
+        {!isMobile && (
+          <div style={{ display: "grid", gap: 12, marginTop: 20 }}>
+            <button style={styles.primaryButton} {...buttonHoverProps()}>
+              Confirm Appointment Request
+            </button>
+            <button style={styles.secondaryButton} onClick={() => setStep("results")} {...buttonHoverProps()}>
+              Back to Results
+            </button>
+          </div>
+        )}
+
+        <p style={{ textAlign: "center", color: "#71717A", fontSize: 14, marginTop: 16, lineHeight: 1.7 }}>
+          Only clients aligned with project scope and investment level are scheduled.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const renderStep = () => {
+    if (step === "home") return renderHome();
+    if (step === "estimate") return renderEstimate();
+    if (step === "results") return renderResults();
+    return renderBooking();
+  };
+
+  return (
+    <div style={styles.page}>
+      <style>
+        {`
+          @keyframes pulse {
+            0% { opacity: 0.6; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1.02); }
+            100% { opacity: 0.6; transform: scale(0.98); }
+          }
+        `}
+      </style>
+      {isCalculating && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(11,11,11,0.96)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 999,
+            flexDirection: "column",
+            color: "#E4E4E7"
+          }}
+        >
+          <div
+            style={{
+              fontSize: 18,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              marginBottom: 14,
+              opacity: 0.8
+            }}
+          >
+            Analyzing Project Scope
+          </div>
+
+          <div
+            style={{
+              fontSize: 32,
+              fontWeight: 700,
+              color: "#C9A96E",
+              animation: "pulse 1.2s ease-in-out infinite"
+            }}
+          >
+            Calculating...
+          </div>
+        </div>
+      )}
+      <div style={styles.shell}>
+        <div style={styles.topBar}>
           <div>
-            <div className="text-[11px] uppercase tracking-[0.35em] text-zinc-500">Harris Contracting</div>
-            <div className="mt-1 text-base font-semibold sm:text-xl">Franchise-Level Client Experience</div>
+            <div style={styles.eyebrow}>Harris Contracting</div>
+            <div style={styles.brandTitle}>Franchise-Level Client Experience</div>
           </div>
-          <div className="flex gap-3">
-            <PrimaryButton onClick={() => setStep(step === "home" ? "estimate" : "booking")}>{step === "home" ? "Start Estimate" : "Book Review"}</PrimaryButton>
-          </div>
-        </header>
+          {step === "home" && <button style={styles.primaryButton} onClick={() => { setEstimateSubstep(0); setStep("estimate"); }} {...buttonHoverProps()}>Start Estimate</button>}
+        </div>
 
-        <StepProgress step={step} />
+        <div key={`${step}-${estimateSubstep}`} style={{ transition: "all 0.3s ease", transform: "translateY(0px)" }}>
+          {renderStep()}
+        </div>
+      </div>
 
-        {step === "home" && (
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8 lg:pt-6">
-            <section className="order-1 lg:order-1 lg:pr-6">
-              <div className="mb-5 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-zinc-300">
-                Projects Starting at $75K+
-              </div>
-              <h1 className="max-w-3xl text-[2.2rem] font-semibold leading-[1.02] sm:text-5xl lg:text-6xl">
-                See What Your Renovation Will Cost <span className="text-[#C9A96E]">Before You Commit</span>
-              </h1>
-              <p className="mt-4 max-w-2xl text-[15px] leading-7 text-zinc-400 sm:text-lg">
-                A guided estimate experience designed to pre-qualify clients, introduce pricing early, and make a one-man operation feel like a premium, system-driven firm.
-              </p>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <PrimaryButton onClick={() => setStep("estimate")}>Start Your Estimate</PrimaryButton>
-                <SecondaryButton onClick={() => setStep("results")}>Preview Results Experience</SecondaryButton>
-              </div>
-
-              <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                {[
-                  "Structured lead filtering",
-                  "Premium pricing presentation",
-                  "Less wasted back-and-forth",
-                ].map((item) => (
-                  <div key={item} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="order-2 lg:order-2">
-              <ShellCard className="overflow-hidden">
-                <div className="border-b border-white/10 p-4 sm:p-6">
-                  <SectionLabel>Live Demo Preview</SectionLabel>
-                  <div className="text-xl font-semibold sm:text-3xl">Client Estimate Experience</div>
-                </div>
-
-                <div className="space-y-4 p-4 sm:space-y-5 sm:p-6">
-                  <div className="rounded-[24px] border border-[#C9A96E]/25 bg-[#C9A96E]/10 p-4 sm:p-6">
-                    <div className="text-sm text-zinc-300">Estimated Investment</div>
-                    <div className="mt-2 text-[1.95rem] font-semibold leading-tight sm:text-4xl">
-                      {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
-                    </div>
-                    <div className="mt-2 text-sm text-zinc-400">Based on current demo selections</div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {projectOptions.map((item) => (
-                      <button
-                        key={item}
-                        onClick={() => setProject(item)}
-                        className={`rounded-2xl border p-4 text-left transition ${
-                          project === item ? "border-[#C9A96E] bg-[#C9A96E]/10" : "border-white/10 bg-white/5 hover:bg-white/10"
-                        }`}
-                      >
-                        <div className="font-medium">{item}</div>
-                        <div className="mt-1 text-sm text-zinc-400">Premium project planning flow</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </ShellCard>
-            </section>
-          </div>
-        )}
-
-        {step === "estimate" && (
-          <div className="mx-auto max-w-4xl">
-            <div className="mb-4 flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <span>Step {stepNumber} of 3</span>
-              <span>Build the estimate first. Fancy comes after structure.</span>
-            </div>
-
-            <ShellCard className="p-5 sm:p-6 lg:p-8">
-              <SectionLabel>Step 1 · Project Builder</SectionLabel>
-              <h2 className="text-[2rem] font-semibold leading-tight sm:text-4xl">Tell us about your project</h2>
-              <p className="mt-3 max-w-2xl text-[15px] leading-7 text-zinc-400 sm:text-base">
-                This screen is focused on one thing only: building a realistic planning range before a project review is scheduled.
-              </p>
-
-              <div className="mt-7 space-y-7">
-                <div>
-                  <SectionLabel>Choose Project Type</SectionLabel>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {projectOptions.map((item) => (
-                      <button
-                        key={item}
-                        onClick={() => setProject(item)}
-                        className={`rounded-3xl border p-5 text-left transition ${
-                          project === item
-                            ? "border-[#C9A96E] bg-[#C9A96E]/10 shadow-[0_0_0_1px_rgba(201,169,110,0.2)]"
-                            : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
-                        }`}
-                      >
-                        <div className="text-base font-medium sm:text-lg">{item}</div>
-                        <div className="mt-1 text-sm text-zinc-400">Select the scope that best matches the project</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <SectionLabel>Select Project Size</SectionLabel>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {sizeOptions.map((item) => (
-                      <OptionButton key={item} active={size === item} label={item} onClick={() => setSize(item)} />
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <SectionLabel>Select Finish Level</SectionLabel>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {finishOptions.map((item) => (
-                      <OptionButton key={item} active={finish === item} label={item} onClick={() => setFinish(item)} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 rounded-[24px] border border-[#C9A96E]/25 bg-[#C9A96E]/10 p-5 sm:p-6">
-                <div className="text-sm text-zinc-300">Current Planning Range</div>
-                <div className="mt-2 text-[1.95rem] font-semibold leading-tight sm:text-4xl">
-                  {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
-                </div>
-                <div className="mt-2 text-sm leading-6 text-zinc-400">
-                  Based on {project}, {size.toLowerCase()} scope, and {finish.toLowerCase()} finishes.
-                </div>
-              </div>
-
-              <div className="mt-7 hidden flex-col gap-3 sm:flex-row lg:flex">
-                <PrimaryButton onClick={() => setStep("results")}>Continue to Results</PrimaryButton>
-                <SecondaryButton onClick={() => setStep("home")}>Back</SecondaryButton>
-              </div>
-            </ShellCard>
-          </div>
-        )}
-
-        {step === "results" && (
-          <div className="mx-auto max-w-5xl">
-            <div className="mb-4 flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <span>Step {stepNumber} of 3</span>
-              <span>Now the number does the heavy lifting.</span>
-            </div>
-
-            <div className="text-center">
-              <SectionLabel>Step 2 · Results Experience</SectionLabel>
-              <h2 className="text-[2rem] font-semibold leading-tight sm:text-4xl lg:text-5xl">Your Project Estimate Is Ready</h2>
-              <p className="mx-auto mt-4 max-w-2xl text-[15px] leading-7 text-zinc-400 sm:text-lg">
-                This is where pricing is introduced before the call, so the conversation starts from clarity instead of guesswork.
-              </p>
-            </div>
-
-            <ShellCard className="mt-8 p-5 sm:p-6 lg:p-8">
-              <div className="rounded-[28px] border border-[#C9A96E]/25 bg-[#C9A96E]/10 p-6 text-center sm:p-8">
-                <div className="text-sm uppercase tracking-[0.25em] text-zinc-300">Estimated Investment</div>
-                <div className="mt-3 text-[2.35rem] font-semibold leading-tight sm:text-5xl lg:text-6xl">
-                  {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
-                </div>
-                <div className="mt-3 text-sm leading-6 text-zinc-400">
-                  This is a general planning range based on the selections made in the estimate builder.
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
-                {[
-                  ["Project", project],
-                  ["Finish", finish],
-                  ["Client Fit", "Premium Match"],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                    <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">{label}</div>
-                    <div className="mt-2 font-medium text-white">{value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-5 grid gap-5 grid-cols-1 lg:grid-cols-[1.05fr_0.95fr]">
-                <div className="rounded-[28px] border border-white/10 bg-black/30 p-5 sm:p-6">
-                  <SectionLabel>Owner Video Placeholder</SectionLabel>
-                  <div className="flex min-h-[220px] items-center justify-center rounded-[24px] border border-white/10 bg-gradient-to-br from-zinc-900 to-zinc-800 p-6 text-center">
-                    <p className="max-w-md text-sm leading-7 text-zinc-300 sm:text-base">
-                      “Based on what you selected, your project falls within this planning range. The next step is a project review where scope, materials, and site conditions are confirmed before final pricing.”
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 sm:p-6">
-                  <SectionLabel>Why This Converts</SectionLabel>
-                  <div className="grid gap-3">
-                    {[
-                      "Pricing is introduced before the call",
-                      "Low-budget leads self-filter",
-                      "The business feels premium and structured",
-                    ].map((item) => (
-                      <div key={item} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-5 hidden gap-3 lg:grid">
-                    <PrimaryButton full onClick={() => setStep("booking")}>Continue to Booking</PrimaryButton>
-                    <SecondaryButton full onClick={() => setStep("estimate")}>Back to Estimate</SecondaryButton>
-                  </div>
-                </div>
-              </div>
-            </ShellCard>
-          </div>
-        )}
-
-        {step === "booking" && (
-          <div className="mx-auto max-w-2xl">
-            <div className="mb-4 flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-400 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <span>Step {stepNumber} of 3</span>
-              <span>Final step: turn interest into a scheduled review.</span>
-            </div>
-
-            <ShellCard className="p-5 sm:p-6 lg:p-8">
-              <div className="text-center">
-                <SectionLabel>Step 3 · Booking</SectionLabel>
-                <h2 className="text-[2rem] font-semibold leading-tight sm:text-4xl">Schedule Your Project Review</h2>
-                <p className="mt-3 text-[15px] leading-7 text-zinc-400 sm:text-lg">
-                  Qualified prospects move from estimate to conversation here. No clutter. No wandering around wondering what comes next.
-                </p>
-              </div>
-
-              <div className="mt-6 grid gap-4">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Full Name"
-                  className="h-14 rounded-2xl border border-white/10 bg-black/30 px-4 text-white outline-none placeholder:text-zinc-500 focus:border-[#C9A96E]"
-                />
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email Address"
-                  className="h-14 rounded-2xl border border-white/10 bg-black/30 px-4 text-white outline-none placeholder:text-zinc-500 focus:border-[#C9A96E]"
-                />
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Phone Number"
-                  className="h-14 rounded-2xl border border-white/10 bg-black/30 px-4 text-white outline-none placeholder:text-zinc-500 focus:border-[#C9A96E]"
-                />
-              </div>
-
-              <div className="mt-6 rounded-[24px] border border-[#C9A96E]/25 bg-[#C9A96E]/10 p-5">
-                <SectionLabel>Project Review Summary</SectionLabel>
-                <div className="text-xl font-semibold text-white sm:text-2xl">{project} · {finish}</div>
-                <div className="mt-2 text-sm leading-6 text-zinc-300">
-                  Planning range: {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
-                </div>
-              </div>
-
-              <div className="mt-5 hidden gap-3 lg:grid">
-                <PrimaryButton full>Confirm Appointment Request</PrimaryButton>
-                <SecondaryButton full onClick={() => setStep("results")}>Back to Results</SecondaryButton>
-              </div>
-
-              <p className="mt-4 text-center text-sm leading-6 text-zinc-500">
-                Only clients aligned with project scope and investment level are scheduled.
-              </p>
-            </ShellCard>
-          </div>
-        )}
-           </div>
-  <MobileStickyCTA
-  step={step}
-  onPrimary={() => {
-    if (step === "estimate") setStep("results");
-    else if (step === "results") setStep("booking");
+      {isMobile && step !== "home" && (
+        <div style={styles.sticky}>
+          {step === "estimate" && (
+           <div
+  style={{
+    ...styles.goldCard,
+    marginBottom: 10,
+    padding: 14,
+    borderRadius: 18,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center"
   }}
-  onSecondary={() => {
-    if (step === "results") setStep("estimate");
-    else if (step === "estimate") setStep("home");
+>
+              <div
+  style={{
+    fontSize: 11,
+    letterSpacing: "0.18em",
+    textTransform: "uppercase",
+    color: "#E4E4E7",
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    opacity: pricePulse ? 0.6 : 1,
+    transform: pricePulse ? "translateY(-2px)" : "translateY(0px)",
+    transition: "all 0.25s ease"
   }}
-/>
-    </motion.div>
-  </AnimatePresence>
-);
+>
+  <span style={{ textAlign: "center" }}>Current Planning Range</span>
+</div>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 700,
+                  lineHeight: 1.15,
+                  marginTop: 6,
+                  textAlign: "center",
+                  transform: pricePulse ? "scale(1.04)" : "scale(1)",
+                  opacity: pricePulse ? 0.95 : 1,
+                  textShadow: pricePulse
+                    ? "0 0 10px rgba(201,169,110,0.35), 0 0 20px rgba(201,169,110,0.25)"
+                    : "0 0 0px rgba(0,0,0,0)",
+                  transition: "transform 0.25s ease, opacity 0.25s ease, text-shadow 0.3s ease"
+                }}
+              >
+                {formatCurrency(estimate.min)} – {formatCurrency(estimate.max)}
+              </div>
+              <div style={{ fontSize: 12, color: colors.muted, marginTop: 6, textAlign: "center" }}>
+                {estimateSubstep === 0 ? project : estimateSubstep === 1 ? `${project} · ${size}` : `${project} · ${size} · ${finish}`}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              style={{ ...styles.secondaryButton, width: "40%" }}
+              onClick={() => {
+                if (step === "estimate") {
+                  if (estimateSubstep > 0) setEstimateSubstep((estimateSubstep - 1) as EstimateSubstep);
+                  else setStep("home");
+                } else if (step === "results") {
+                  setEstimateSubstep(2);
+                  setStep("estimate");
+                } else if (step === "booking") {
+                  setStep("results");
+                }
+              }}
+            >
+              {step === "estimate" ? "Back" : step === "results" ? "Edit Estimate" : "Back to Results"}
+            </button>
+            <button
+              style={{ ...styles.primaryButton, flex: 1 }}
+              onClick={() => {
+                if (step === "estimate") {
+                  if (estimateSubstep < 2) setEstimateSubstep((estimateSubstep + 1) as EstimateSubstep);
+                  else {
+                    setIsCalculating(true);
+                    window.setTimeout(() => {
+                      setIsCalculating(false);
+                      setStep("results");
+                    }, 900);
+                  }
+                } else if (step === "results") {
+                  setStep("booking");
+                } else {
+                  console.log("Confirm Appointment Request");
+                }
+              }}
+            >
+              {step === "estimate" ? (estimateSubstep < 2 ? "Continue" : "Continue to Results") : step === "results" ? "Continue to Booking" : "Confirm Appointment"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
